@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+migrations/
+schema.sql
+migrate.py
+verify_schema.py
+cleanup_test_data.py
