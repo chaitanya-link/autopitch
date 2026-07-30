@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type Campaign, type Lead } from "../lib/api";
 import { NavRail } from "../components/NavRail";
 import { TelemetryStrip } from "../components/TelemetryStrip";
 import { LeadTable } from "../components/LeadTable";
 import { LeadDetailDrawer } from "../components/LeadDetailDrawer";
+
+const SIGNAL_POLL_INTERVAL_MS = 20000;
+const FLASH_DURATION_MS = 2500;
 
 export function Dashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -12,6 +15,8 @@ export function Dashboard() {
   const [selected, setSelected] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [justReplied, setJustReplied] = useState<Set<string>>(new Set());
+  const [checkingSignals, setCheckingSignals] = useState(false);
 
   useEffect(() => {
     api
@@ -27,10 +32,56 @@ export function Dashboard() {
       });
   }, []);
 
+  const applyLeadsUpdate = useCallback((newLeads: Lead[]) => {
+    setLeads((prevLeads) => {
+      const prevStatus = new Map(prevLeads.map((l) => [l.id, l.status]));
+      const newlyReplied = newLeads
+        .filter((l) => l.status === "replied" && prevStatus.get(l.id) !== "replied")
+        .map((l) => l.id);
+      if (newlyReplied.length > 0) {
+        setJustReplied(new Set(newlyReplied));
+        setTimeout(() => setJustReplied(new Set()), FLASH_DURATION_MS);
+      }
+      return newLeads;
+    });
+  }, []);
+
+  const refreshLeads = useCallback(
+    async (id: string) => {
+      try {
+        applyLeadsUpdate(await api.listLeads(id));
+      } catch {
+        // transient poll failure, keep showing last known state
+      }
+    },
+    [applyLeadsUpdate],
+  );
+
+  const pollSignals = useCallback(
+    async (id: string) => {
+      try {
+        await api.checkReplies(id);
+      } catch {
+        // reply check unavailable this cycle; still refresh in case something changed
+      }
+      await refreshLeads(id);
+    },
+    [refreshLeads],
+  );
+
   useEffect(() => {
     if (!campaignId) return;
-    api.listLeads(campaignId).then(setLeads).catch(() => setLeads([]));
-  }, [campaignId]);
+    refreshLeads(campaignId);
+    const interval = setInterval(() => pollSignals(campaignId), SIGNAL_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [campaignId, refreshLeads, pollSignals]);
+
+  async function handleCheckSignals() {
+    if (!campaignId) return;
+    setCheckingSignals(true);
+    await pollSignals(campaignId);
+    setCheckingSignals(false);
+  }
 
   function handleUpdated(updated: Lead) {
     setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
@@ -43,7 +94,7 @@ export function Dashboard() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header
-          className="flex items-center justify-between border-b px-6 py-4"
+          className="flex items-center justify-between gap-3 border-b px-6 py-4"
           style={{ borderColor: "var(--color-border)" }}
         >
           <div>
@@ -52,20 +103,33 @@ export function Dashboard() {
               {campaigns.find((c) => c.id === campaignId)?.product_name ?? "No campaign selected"}
             </p>
           </div>
-          {campaigns.length > 1 && (
-            <select
-              value={campaignId ?? ""}
-              onChange={(e) => setCampaignId(e.target.value)}
-              className="rounded-sm border px-2 py-1 font-mono text-xs"
-              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-surface)", color: "var(--color-text-primary)" }}
-            >
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.product_name}
-                </option>
-              ))}
-            </select>
-          )}
+          <div className="flex items-center gap-2">
+            {campaignId && (
+              <button
+                type="button"
+                onClick={handleCheckSignals}
+                disabled={checkingSignals}
+                className="rounded-sm border px-2.5 py-1 font-mono text-xs transition-colors disabled:opacity-40"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+              >
+                {checkingSignals ? "checking…" : "Check Signals"}
+              </button>
+            )}
+            {campaigns.length > 1 && (
+              <select
+                value={campaignId ?? ""}
+                onChange={(e) => setCampaignId(e.target.value)}
+                className="rounded-sm border px-2 py-1 font-mono text-xs"
+                style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-surface)", color: "var(--color-text-primary)" }}
+              >
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.product_name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </header>
 
         {loading ? (
@@ -87,7 +151,12 @@ export function Dashboard() {
         ) : (
           <>
             <TelemetryStrip leads={leads} />
-            <LeadTable leads={leads} selectedId={selected?.id ?? null} onSelect={setSelected} />
+            <LeadTable
+              leads={leads}
+              selectedId={selected?.id ?? null}
+              onSelect={setSelected}
+              justRepliedIds={justReplied}
+            />
           </>
         )}
       </div>

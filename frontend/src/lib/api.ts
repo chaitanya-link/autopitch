@@ -61,6 +61,13 @@ export interface PacingStatus {
   daily_cap_reached: boolean;
 }
 
+export interface ReplyCheckResult {
+  success: boolean;
+  checked: number;
+  new_replies: number;
+  error: string | null;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -110,6 +117,8 @@ export const api = {
     request<LeadChunk[]>(`/leads/${leadId}/context?query=${encodeURIComponent(query)}&top_k=${topK}`),
   runSend: (leadId: string) => request<SendResult>(`/leads/${leadId}/send`, { method: "POST" }),
   getPacing: (campaignId: string) => request<PacingStatus>(`/campaigns/${campaignId}/pacing`),
+  checkReplies: (campaignId: string) =>
+    request<ReplyCheckResult>(`/campaigns/${campaignId}/check-replies`, { method: "POST" }),
   uploadLeadsCsv: async (campaignId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);

@@ -15,10 +15,12 @@ export function LeadTable({
   leads,
   selectedId,
   onSelect,
+  justRepliedIds,
 }: {
   leads: Lead[];
   selectedId: string | null;
   onSelect: (lead: Lead) => void;
+  justRepliedIds?: Set<string>;
 }) {
   if (leads.length === 0) {
     return (
@@ -54,7 +56,9 @@ export function LeadTable({
               onClick={() => onSelect(lead)}
               tabIndex={0}
               onKeyDown={(e) => e.key === "Enter" && onSelect(lead)}
-              className="cursor-pointer border-b transition-colors focus-visible:outline-none"
+              className={`cursor-pointer border-b transition-colors focus-visible:outline-none ${
+                justRepliedIds?.has(lead.id) ? "animate-flash-once" : ""
+              }`}
               style={{
                 borderColor: "var(--color-border)",
                 backgroundColor: selectedId === lead.id ? "var(--color-bg-hover)" : "transparent",

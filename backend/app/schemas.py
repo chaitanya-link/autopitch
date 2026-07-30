@@ -97,6 +97,13 @@ class SendResponse(BaseModel):
     lead: LeadRead
 
 
+class ReplyCheckResponse(BaseModel):
+    success: bool
+    checked: int
+    new_replies: int
+    error: Optional[str]
+
+
 class PacingResponse(BaseModel):
     can_send_now: bool
     seconds_until_next_send: int

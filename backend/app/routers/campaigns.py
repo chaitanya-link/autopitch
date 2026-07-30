@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.mailer.pacing import get_pacing_status
+from app.mailer.reply_checker import check_replies_for_campaign
 from app.models import Campaign
-from app.schemas import CampaignCreate, CampaignRead, PacingResponse
+from app.schemas import CampaignCreate, CampaignRead, PacingResponse, ReplyCheckResponse
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -45,4 +46,18 @@ def get_campaign_pacing(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
         sent_today=status.sent_today,
         daily_cap=status.daily_cap,
         daily_cap_reached=status.daily_cap_reached,
+    )
+
+
+@router.post("/{campaign_id}/check-replies", response_model=ReplyCheckResponse)
+def check_replies(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    result = check_replies_for_campaign(campaign_id, db)
+    return ReplyCheckResponse(
+        success=result.success,
+        checked=result.checked,
+        new_replies=result.new_replies,
+        error=result.error,
     )
