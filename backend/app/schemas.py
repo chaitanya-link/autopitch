@@ -10,6 +10,8 @@ class CampaignCreate(BaseModel):
     product_name: str
     product_url: str
     product_summary: Optional[str] = None
+    sender_email: EmailStr
+    sender_app_password: str
     pacing_seconds: int = 60
     daily_cap: int = 50
 
@@ -22,6 +24,7 @@ class CampaignRead(BaseModel):
     product_name: str
     product_url: str
     product_summary: Optional[str]
+    sender_email: Optional[str]
     pacing_seconds: int
     daily_cap: int
     created_at: datetime

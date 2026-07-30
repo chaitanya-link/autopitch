@@ -14,6 +14,8 @@ class Campaign(Base):
     product_name = Column(String, nullable=False)
     product_url = Column(String, nullable=False)
     product_summary = Column(Text, nullable=True)
+    sender_email = Column(String, nullable=True)
+    sender_app_password = Column(String, nullable=True)
     pacing_seconds = Column(Integer, nullable=False, default=60)
     daily_cap = Column(Integer, nullable=False, default=50)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

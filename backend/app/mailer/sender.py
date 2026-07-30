@@ -1,4 +1,3 @@
-import os
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import make_msgid
@@ -17,11 +16,8 @@ def verify_email_format(email: str) -> tuple[bool, str | None]:
         return False, str(exc)
 
 
-def send_email(to_email: str, subject: str, body: str) -> str:
-    """Sends an email via Gmail SMTP. Returns the Message-ID assigned to the outgoing mail."""
-    sender = os.environ["GMAIL_SENDER_ADDRESS"]
-    password = os.environ["GMAIL_APP_PASSWORD"]
-
+def send_email(to_email: str, subject: str, body: str, sender: str, password: str) -> str:
+    """Sends an email via Gmail SMTP from the given sender account. Returns the assigned Message-ID."""
     msg = MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = sender

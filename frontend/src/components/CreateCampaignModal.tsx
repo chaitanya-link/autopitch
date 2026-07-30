@@ -10,6 +10,8 @@ export function CreateCampaignModal({
 }) {
   const [productName, setProductName] = useState("");
   const [productUrl, setProductUrl] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderAppPassword, setSenderAppPassword] = useState("");
   const [pacingSeconds, setPacingSeconds] = useState(60);
   const [dailyCap, setDailyCap] = useState(50);
   const [busy, setBusy] = useState(false);
@@ -23,6 +25,8 @@ export function CreateCampaignModal({
       const campaign = await api.createCampaign({
         product_name: productName,
         product_url: productUrl,
+        sender_email: senderEmail,
+        sender_app_password: senderAppPassword.replace(/\s+/g, ""),
         pacing_seconds: pacingSeconds,
         daily_cap: dailyCap,
       });
@@ -70,6 +74,41 @@ export function CreateCampaignModal({
               className="mt-1 w-full rounded-sm border px-3 py-2 text-sm outline-none"
               style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-surface)", color: "var(--color-text-primary)" }}
             />
+          </Field>
+          <Field label="Send from (Gmail address)">
+            <input
+              required
+              type="email"
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              placeholder="you@gmail.com"
+              className="mt-1 w-full rounded-sm border px-3 py-2 text-sm outline-none"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-surface)", color: "var(--color-text-primary)" }}
+            />
+          </Field>
+          <Field label="Gmail App Password">
+            <input
+              required
+              type="password"
+              value={senderAppPassword}
+              onChange={(e) => setSenderAppPassword(e.target.value)}
+              placeholder="16-character app password"
+              className="mt-1 w-full rounded-sm border px-3 py-2 text-sm font-mono outline-none"
+              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-surface)", color: "var(--color-text-primary)" }}
+            />
+            <span className="mt-1 block text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+              Requires 2-Step Verification enabled on that account. Generate one at{" "}
+              <a
+                href="https://myaccount.google.com/apppasswords"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+                style={{ color: "var(--color-accent-live)" }}
+              >
+                myaccount.google.com/apppasswords
+              </a>
+              . Emails send from this account, not your personal inbox.
+            </span>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Pacing (seconds)">

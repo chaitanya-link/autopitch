@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.mailer.credentials import get_sender_credentials
 from app.mailer.pacing import get_pacing_status
 from app.mailer.sender import send_email, verify_email_format
 from app.models import Campaign, EmailLog, Lead
@@ -55,7 +56,8 @@ def send_lead_email(lead_id: uuid.UUID, db: Session) -> SendResult:
         )
 
     try:
-        message_id = send_email(lead.email, lead.draft_subject, lead.draft_body)
+        sender_email, sender_password = get_sender_credentials(campaign)
+        message_id = send_email(lead.email, lead.draft_subject, lead.draft_body, sender_email, sender_password)
     except Exception as exc:
         lead.status = "failed"
         lead.failure_reason = f"Send failed: {exc}"

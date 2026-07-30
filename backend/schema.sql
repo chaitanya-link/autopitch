@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
     product_name TEXT NOT NULL,
     product_url TEXT NOT NULL,
     product_summary TEXT,
+    sender_email TEXT,
+    sender_app_password TEXT,
     pacing_seconds INTEGER NOT NULL DEFAULT 60,
     daily_cap INTEGER NOT NULL DEFAULT 50,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

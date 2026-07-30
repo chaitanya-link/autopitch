@@ -1,13 +1,13 @@
 import email as email_pkg
 import imaplib
-import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models import EmailLog, Lead
+from app.mailer.credentials import get_sender_credentials
+from app.models import Campaign, EmailLog, Lead
 
 IMAP_HOST = "imap.gmail.com"
 IMAP_PORT = 993
@@ -42,6 +42,10 @@ def _extract_snippet(raw_message: bytes) -> str:
 
 
 def check_replies_for_campaign(campaign_id: uuid.UUID, db: Session) -> ReplyCheckResult:
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if campaign is None:
+        return ReplyCheckResult(success=False, checked=0, new_replies=0, error="Campaign not found")
+
     pending_logs = (
         db.query(EmailLog)
         .join(Lead, EmailLog.lead_id == Lead.id)
@@ -61,8 +65,7 @@ def check_replies_for_campaign(campaign_id: uuid.UUID, db: Session) -> ReplyChec
     since_date = (earliest_sent - timedelta(days=1)).strftime("%d-%b-%Y")
 
     try:
-        sender = os.environ["GMAIL_SENDER_ADDRESS"]
-        password = os.environ["GMAIL_APP_PASSWORD"]
+        sender, password = get_sender_credentials(campaign)
         mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, timeout=20)
         mail.login(sender, password)
         mail.select("INBOX", readonly=True)
