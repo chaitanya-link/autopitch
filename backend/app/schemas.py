@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class CampaignCreate(BaseModel):
-    user_id: uuid.UUID
     product_name: str
     product_url: str
     product_summary: Optional[str] = None

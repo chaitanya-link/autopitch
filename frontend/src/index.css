@@ -100,3 +100,29 @@ body {
     animation: none;
   }
 }
+
+.hero-spotlight {
+  --mouse-x: 50%;
+  --mouse-y: 30%;
+}
+
+.hero-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    600px circle at var(--mouse-x) var(--mouse-y),
+    rgba(255, 122, 69, 0.12),
+    transparent 70%
+  );
+  transition: background 0.15s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-spotlight::before {
+    background: radial-gradient(800px circle at 50% 0%, rgba(255, 122, 69, 0.08), transparent 70%);
+    transition: none;
+  }
+}

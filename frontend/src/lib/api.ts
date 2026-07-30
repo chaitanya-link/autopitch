@@ -1,4 +1,12 @@
+import { supabase } from "./supabase";
+
 const API_URL = import.meta.env.VITE_API_URL as string;
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export type LeadStatus =
   | "queued"
@@ -69,8 +77,9 @@ export interface ReplyCheckResult {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const auth = await authHeaders();
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...auth },
     ...options,
   });
   if (!res.ok) {
@@ -83,7 +92,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   listCampaigns: () => request<Campaign[]>("/campaigns"),
   createCampaign: (payload: {
-    user_id: string;
     product_name: string;
     product_url: string;
     pacing_seconds?: number;
@@ -122,8 +130,10 @@ export const api = {
   uploadLeadsCsv: async (campaignId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
+    const auth = await authHeaders();
     const res = await fetch(`${API_URL}/leads/upload-csv?campaign_id=${campaignId}`, {
       method: "POST",
+      headers: auth,
       body: form,
     });
     if (!res.ok) {

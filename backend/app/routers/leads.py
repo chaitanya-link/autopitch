@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.agent.draft import draft_email_for_lead
+from app.auth import get_current_user
 from app.database import get_db
 from app.mailer.dispatch import send_lead_email
-from app.models import Campaign, Lead
+from app.models import Lead
+from app.ownership import get_owned_campaign, get_owned_lead
 from app.rag.pipeline import research_lead
 from app.rag.retrieve import retrieve_top_chunks
 from app.schemas import (
@@ -27,7 +29,8 @@ REQUIRED_CSV_COLUMNS = {"company_name", "founder_name", "email", "company_url"}
 
 
 @router.post("", response_model=LeadRead, status_code=201)
-def create_lead(payload: LeadCreate, db: Session = Depends(get_db)):
+def create_lead(payload: LeadCreate, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    get_owned_campaign(payload.campaign_id, user, db)
     lead = Lead(**payload.model_dump())
     db.add(lead)
     db.commit()
@@ -40,10 +43,9 @@ async def upload_leads_csv(
     campaign_id: uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
 ):
-    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+    get_owned_campaign(campaign_id, user, db)
 
     raw = (await file.read()).decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(raw))
@@ -75,27 +77,24 @@ async def upload_leads_csv(
 
 
 @router.get("", response_model=list[LeadRead])
-def list_leads(campaign_id: uuid.UUID | None = None, db: Session = Depends(get_db)):
-    query = db.query(Lead)
-    if campaign_id:
-        query = query.filter(Lead.campaign_id == campaign_id)
-    return query.order_by(Lead.created_at.desc()).all()
+def list_leads(campaign_id: uuid.UUID, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    get_owned_campaign(campaign_id, user, db)
+    return (
+        db.query(Lead)
+        .filter(Lead.campaign_id == campaign_id)
+        .order_by(Lead.created_at.desc())
+        .all()
+    )
 
 
 @router.get("/{lead_id}", response_model=LeadRead)
-def get_lead(lead_id: uuid.UUID, db: Session = Depends(get_db)):
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-    return lead
+def get_lead(lead_id: uuid.UUID, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    return get_owned_lead(lead_id, user, db)
 
 
 @router.post("/{lead_id}/research", response_model=ResearchResponse)
-def run_research(lead_id: uuid.UUID, db: Session = Depends(get_db)):
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
+def run_research(lead_id: uuid.UUID, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    lead = get_owned_lead(lead_id, user, db)
     result = research_lead(lead_id, db)
     db.refresh(lead)
     return ResearchResponse(
@@ -108,11 +107,8 @@ def run_research(lead_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{lead_id}/draft", response_model=DraftResponse)
-def run_draft(lead_id: uuid.UUID, db: Session = Depends(get_db)):
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
+def run_draft(lead_id: uuid.UUID, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    get_owned_lead(lead_id, user, db)
     result = draft_email_for_lead(lead_id, db)
     return DraftResponse(
         success=result.success,
@@ -124,11 +120,8 @@ def run_draft(lead_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{lead_id}/send", response_model=SendResponse)
-def run_send(lead_id: uuid.UUID, db: Session = Depends(get_db)):
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
+def run_send(lead_id: uuid.UUID, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    get_owned_lead(lead_id, user, db)
     result = send_lead_email(lead_id, db)
     return SendResponse(
         success=result.success,
@@ -140,22 +133,27 @@ def run_send(lead_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{lead_id}/context", response_model=list[LeadChunkRead])
-def get_lead_context(lead_id: uuid.UUID, query: str, top_k: int = 5, db: Session = Depends(get_db)):
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
+def get_lead_context(
+    lead_id: uuid.UUID,
+    query: str,
+    top_k: int = 5,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    get_owned_lead(lead_id, user, db)
     return retrieve_top_chunks(lead_id, query, db, top_k=top_k)
 
 
 @router.patch("/{lead_id}", response_model=LeadRead)
-def update_lead(lead_id: uuid.UUID, payload: LeadUpdate, db: Session = Depends(get_db)):
-    lead = db.query(Lead).filter(Lead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
+def update_lead(
+    lead_id: uuid.UUID,
+    payload: LeadUpdate,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    lead = get_owned_lead(lead_id, user, db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(lead, field, value)
-
     db.commit()
     db.refresh(lead)
     return lead

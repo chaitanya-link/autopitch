@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { api, type Campaign, type Lead } from "../lib/api";
 import { NavRail } from "../components/NavRail";
 import { TelemetryStrip } from "../components/TelemetryStrip";
 import { LeadTable } from "../components/LeadTable";
 import { LeadDetailDrawer } from "../components/LeadDetailDrawer";
+import { CreateCampaignModal } from "../components/CreateCampaignModal";
+import { AddLeadModal } from "../components/AddLeadModal";
 
 const SIGNAL_POLL_INTERVAL_MS = 20000;
 const FLASH_DURATION_MS = 2500;
 
-export function Dashboard() {
+export function Dashboard({ session }: { session: Session }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -17,13 +20,19 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [justReplied, setJustReplied] = useState<Set<string>>(new Set());
   const [checkingSignals, setCheckingSignals] = useState(false);
+  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [showAddLead, setShowAddLead] = useState(false);
 
-  useEffect(() => {
-    api
+  const loadCampaigns = useCallback((selectId?: string) => {
+    return api
       .listCampaigns()
       .then((cs) => {
         setCampaigns(cs);
-        if (cs.length > 0) setCampaignId(cs[0].id);
+        if (selectId) {
+          setCampaignId(selectId);
+        } else {
+          setCampaignId((prev) => (prev && cs.some((c) => c.id === prev) ? prev : (cs[0]?.id ?? null)));
+        }
         setLoading(false);
       })
       .catch((e) => {
@@ -31,6 +40,10 @@ export function Dashboard() {
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
 
   const applyLeadsUpdate = useCallback((newLeads: Lead[]) => {
     setLeads((prevLeads) => {
@@ -90,11 +103,11 @@ export function Dashboard() {
 
   return (
     <div className="flex h-svh flex-col md:flex-row" style={{ backgroundColor: "var(--color-bg-base)" }}>
-      <NavRail />
+      <NavRail userEmail={session.user.email} />
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header
-          className="flex items-center justify-between gap-3 border-b px-6 py-4"
+          className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4"
           style={{ borderColor: "var(--color-border)" }}
         >
           <div>
@@ -103,18 +116,39 @@ export function Dashboard() {
               {campaigns.find((c) => c.id === campaignId)?.product_name ?? "No campaign selected"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {campaignId && (
-              <button
-                type="button"
-                onClick={handleCheckSignals}
-                disabled={checkingSignals}
-                className="rounded-sm border px-2.5 py-1 font-mono text-xs transition-colors disabled:opacity-40"
-                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-              >
-                {checkingSignals ? "checking…" : "Check Signals"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowAddLead(true)}
+                  className="rounded-sm border px-2.5 py-1 font-mono text-xs transition-colors"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                >
+                  + Add Lead
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCheckSignals}
+                  disabled={checkingSignals}
+                  className="rounded-sm border px-2.5 py-1 font-mono text-xs transition-colors disabled:opacity-40"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                >
+                  {checkingSignals ? "checking…" : "Check Signals"}
+                </button>
+              </>
             )}
+            <button
+              type="button"
+              onClick={() => setShowCreateCampaign(true)}
+              className="rounded-sm border px-2.5 py-1 font-mono text-xs transition-colors"
+              style={{
+                borderColor: "var(--color-accent-live)",
+                color: "var(--color-accent-live)",
+              }}
+            >
+              + New Campaign
+            </button>
             {campaigns.length > 1 && (
               <select
                 value={campaignId ?? ""}
@@ -145,24 +179,69 @@ export function Dashboard() {
             </p>
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center font-mono text-sm" style={{ color: "var(--color-text-tertiary)" }}>
-            No campaigns yet. Create one via the API to get started.
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 font-mono text-sm" style={{ color: "var(--color-text-tertiary)" }}>
+            <p>No campaigns yet.</p>
+            <button
+              type="button"
+              onClick={() => setShowCreateCampaign(true)}
+              className="rounded-sm border px-3 py-1.5 font-mono text-xs"
+              style={{
+                borderColor: "var(--color-accent-live)",
+                backgroundColor: "var(--color-accent-live-dim)",
+                color: "var(--color-accent-live)",
+              }}
+            >
+              + New Campaign
+            </button>
           </div>
         ) : (
           <>
             <TelemetryStrip leads={leads} />
-            <LeadTable
-              leads={leads}
-              selectedId={selected?.id ?? null}
-              onSelect={setSelected}
-              justRepliedIds={justReplied}
-            />
+            {leads.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 font-mono text-sm" style={{ color: "var(--color-text-tertiary)" }}>
+                <p>No leads tracked in this campaign yet.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddLead(true)}
+                  className="rounded-sm border px-3 py-1.5 font-mono text-xs"
+                  style={{
+                    borderColor: "var(--color-accent-live)",
+                    backgroundColor: "var(--color-accent-live-dim)",
+                    color: "var(--color-accent-live)",
+                  }}
+                >
+                  + Add Lead
+                </button>
+              </div>
+            ) : (
+              <LeadTable
+                leads={leads}
+                selectedId={selected?.id ?? null}
+                onSelect={setSelected}
+                justRepliedIds={justReplied}
+              />
+            )}
           </>
         )}
       </div>
 
       {selected && (
         <LeadDetailDrawer lead={selected} onClose={() => setSelected(null)} onUpdated={handleUpdated} />
+      )}
+
+      {showCreateCampaign && (
+        <CreateCampaignModal
+          onClose={() => setShowCreateCampaign(false)}
+          onCreated={(c) => loadCampaigns(c.id)}
+        />
+      )}
+
+      {showAddLead && campaignId && (
+        <AddLeadModal
+          campaignId={campaignId}
+          onClose={() => setShowAddLead(false)}
+          onAdded={() => refreshLeads(campaignId)}
+        />
       )}
     </div>
   );
