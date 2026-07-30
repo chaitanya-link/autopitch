@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Lead, type LeadChunk } from "../lib/api";
+import { api, type Lead, type LeadChunk, type PacingStatus } from "../lib/api";
 import { StatusChip } from "./StatusChip";
 
 export function LeadDetailDrawer({
@@ -14,8 +14,24 @@ export function LeadDetailDrawer({
   const [subject, setSubject] = useState(lead.draft_subject ?? "");
   const [body, setBody] = useState(lead.draft_body ?? "");
   const [chunks, setChunks] = useState<LeadChunk[]>([]);
-  const [busy, setBusy] = useState<"research" | "draft" | "save" | null>(null);
+  const [busy, setBusy] = useState<"research" | "draft" | "save" | "send" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
+  const [pacing, setPacing] = useState<PacingStatus | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    api.getPacing(lead.campaign_id).then((p) => {
+      setPacing(p);
+      setCountdown(p.seconds_until_next_send);
+    });
+  }, [lead.campaign_id, lead.status]);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -73,6 +89,28 @@ export function LeadDetailDrawer({
       onUpdated(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function approveAndSend() {
+    setBusy("send");
+    setError(null);
+    setSendNotice(null);
+    try {
+      const result = await api.runSend(lead.id);
+      onUpdated(result.lead);
+      if (result.success) {
+        setSendNotice("Dispatched. Signal will register here on reply.");
+      } else if (result.rate_limited) {
+        setSendNotice(result.error);
+        if (result.retry_after_seconds) setCountdown(result.retry_after_seconds);
+      } else {
+        setError(result.error ?? "Send failed");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Send failed");
     } finally {
       setBusy(null);
     }
@@ -189,13 +227,38 @@ export function LeadDetailDrawer({
           </div>
 
           <div className="flex items-center gap-3">
-            <ActionButton onClick={saveDraft} busy={busy === "save"} primary>
+            <ActionButton onClick={saveDraft} busy={busy === "save"}>
               Save Edits
             </ActionButton>
-            <span className="font-mono text-xs" style={{ color: "var(--color-text-tertiary)" }}>
-              Sending pipeline arrives in Step 5 — edits save now, dispatch comes next.
-            </span>
+            <ActionButton
+              onClick={approveAndSend}
+              busy={busy === "send"}
+              disabled={!subject || !body || countdown > 0 || pacing?.daily_cap_reached}
+              primary
+            >
+              Approve &amp; Send
+            </ActionButton>
           </div>
+
+          {sendNotice && (
+            <p className="text-sm" style={{ color: "var(--color-accent-success)" }}>
+              {sendNotice}
+            </p>
+          )}
+
+          {pacing && (
+            <div className="flex items-center gap-4 font-mono text-xs" style={{ color: "var(--color-text-tertiary)" }}>
+              <span>
+                sent today: {pacing.sent_today}/{pacing.daily_cap}
+              </span>
+              {countdown > 0 && (
+                <span style={{ color: "var(--color-status-review)" }}>next send in {countdown}s</span>
+              )}
+              {pacing.daily_cap_reached && (
+                <span style={{ color: "var(--color-status-failed)" }}>daily cap reached</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

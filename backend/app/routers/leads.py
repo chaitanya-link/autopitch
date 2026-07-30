@@ -7,10 +7,19 @@ from sqlalchemy.orm import Session
 
 from app.agent.draft import draft_email_for_lead
 from app.database import get_db
+from app.mailer.dispatch import send_lead_email
 from app.models import Campaign, Lead
 from app.rag.pipeline import research_lead
 from app.rag.retrieve import retrieve_top_chunks
-from app.schemas import DraftResponse, LeadChunkRead, LeadCreate, LeadRead, LeadUpdate, ResearchResponse
+from app.schemas import (
+    DraftResponse,
+    LeadChunkRead,
+    LeadCreate,
+    LeadRead,
+    LeadUpdate,
+    ResearchResponse,
+    SendResponse,
+)
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -110,6 +119,22 @@ def run_draft(lead_id: uuid.UUID, db: Session = Depends(get_db)):
         confidence=result.confidence,
         reasoning=result.reasoning,
         error=result.error,
+        lead=result.lead,
+    )
+
+
+@router.post("/{lead_id}/send", response_model=SendResponse)
+def run_send(lead_id: uuid.UUID, db: Session = Depends(get_db)):
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    result = send_lead_email(lead_id, db)
+    return SendResponse(
+        success=result.success,
+        error=result.error,
+        rate_limited=result.rate_limited,
+        retry_after_seconds=result.retry_after_seconds,
         lead=result.lead,
     )
 

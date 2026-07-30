@@ -87,3 +87,19 @@ class LeadChunkRead(BaseModel):
     id: uuid.UUID
     source_url: str
     content: str
+
+
+class SendResponse(BaseModel):
+    success: bool
+    error: Optional[str]
+    rate_limited: bool
+    retry_after_seconds: Optional[int]
+    lead: LeadRead
+
+
+class PacingResponse(BaseModel):
+    can_send_now: bool
+    seconds_until_next_send: int
+    sent_today: int
+    daily_cap: int
+    daily_cap_reached: bool

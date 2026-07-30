@@ -45,6 +45,22 @@ export interface LeadChunk {
   content: string;
 }
 
+export interface SendResult {
+  success: boolean;
+  error: string | null;
+  rate_limited: boolean;
+  retry_after_seconds: number | null;
+  lead: Lead;
+}
+
+export interface PacingStatus {
+  can_send_now: boolean;
+  seconds_until_next_send: number;
+  sent_today: number;
+  daily_cap: number;
+  daily_cap_reached: boolean;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -92,6 +108,8 @@ export const api = {
     ),
   getContext: (leadId: string, query: string, topK = 5) =>
     request<LeadChunk[]>(`/leads/${leadId}/context?query=${encodeURIComponent(query)}&top_k=${topK}`),
+  runSend: (leadId: string) => request<SendResult>(`/leads/${leadId}/send`, { method: "POST" }),
+  getPacing: (campaignId: string) => request<PacingStatus>(`/campaigns/${campaignId}/pacing`),
   uploadLeadsCsv: async (campaignId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
