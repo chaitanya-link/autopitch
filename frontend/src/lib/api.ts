@@ -24,7 +24,6 @@ export interface Campaign {
   product_name: string;
   product_url: string;
   product_summary: string | null;
-  sender_email: string | null;
   pacing_seconds: number;
   daily_cap: number;
   created_at: string;
@@ -95,8 +94,6 @@ export const api = {
   createCampaign: (payload: {
     product_name: string;
     product_url: string;
-    sender_email: string;
-    sender_app_password: string;
     pacing_seconds?: number;
     daily_cap?: number;
   }) => request<Campaign>("/campaigns", { method: "POST", body: JSON.stringify(payload) }),
