@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@theme {
+  --color-bg-base: #0b0d10;
+  --color-bg-surface: #12151a;
+  --color-bg-elevated: #1a1f26;
+  --color-bg-hover: #1f242c;
+  --color-border: #262c35;
+  --color-border-strong: #333a46;
+
+  --color-text-primary: #e6e9ef;
+  --color-text-secondary: #8a93a3;
+  --color-text-tertiary: #5c6472;
+
+  --color-accent-live: #ff7a45;
+  --color-accent-live-dim: #7a3d24;
+  --color-accent-success: #3fae79;
+  --color-accent-success-dim: #1f4a35;
+
+  --color-status-queued: #5b6472;
+  --color-status-researched: #6b7a8f;
+  --color-status-drafted: #8a93a3;
+  --color-status-sent: #4a5568;
+  --color-status-review: #c9a227;
+  --color-status-failed: #b5555c;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--color-accent-live-dim);
+  color: var(--color-text-primary);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-live);
+  outline-offset: 2px;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes flash-once {
+  0% {
+    background-color: var(--color-accent-success-dim);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+.animate-flash-once {
+  animation: flash-once 2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-dot,
+  .animate-flash-once {
+    animation: none;
+  }
+}

@@ -28,3 +28,6 @@ Thumbs.db
 
 # Docker
 *.pid
+
+# Playwright verification screenshots (not project deliverables)
+.playwright-mcp/
