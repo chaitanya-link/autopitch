@@ -5,7 +5,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.agent.client import GENERATION_MODEL, get_client
+from app.agent.client import generate_with_fallback
 from app.agent.product_summary import get_or_create_product_summary
 from app.models import Campaign, Lead
 from app.rag.retrieve import retrieve_top_chunks
@@ -75,7 +75,7 @@ def draft_email_for_lead(lead_id: uuid.UUID, db: Session) -> DraftResult:
     )
     if not chunks:
         lead.status = "needs_review"
-        lead.failure_reason = "No research context available — run research before drafting"
+        lead.failure_reason = "No research context available - run research before drafting"
         db.commit()
         return DraftResult(success=False, lead=lead, confidence=None, reasoning=None, error=lead.failure_reason)
 
@@ -96,9 +96,7 @@ def draft_email_for_lead(lead_id: uuid.UUID, db: Session) -> DraftResult:
     )
 
     try:
-        client = get_client()
-        response = client.models.generate_content(
-            model=GENERATION_MODEL,
+        response = generate_with_fallback(
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,

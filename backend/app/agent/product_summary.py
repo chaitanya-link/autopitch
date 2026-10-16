@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.agent.client import GENERATION_MODEL, get_client
+from app.agent.client import generate_with_fallback
 from app.models import Campaign
 from app.rag.scraper import scrape_company_site
 
@@ -10,7 +10,7 @@ SUMMARY_PROMPT = """You are researching a company so a salesperson can pitch it 
 Company name: {product_name}
 Raw scraped website text follows. Write a concise 3-4 sentence summary covering:
 what the product/service does, who it's for, and its core value proposition.
-Be specific and factual — no marketing fluff, no invented details not supported by the text.
+Be specific and factual - no marketing fluff, no invented details not supported by the text.
 
 Website text:
 {content}
@@ -27,9 +27,7 @@ def get_or_create_product_summary(campaign: Campaign, db: Session) -> str:
     else:
         content = "(site could not be scraped; rely on the product name only)"
 
-    client = get_client()
-    response = client.models.generate_content(
-        model=GENERATION_MODEL,
+    response = generate_with_fallback(
         contents=SUMMARY_PROMPT.format(product_name=campaign.product_name, content=content),
     )
     summary = (response.text or "").strip() or f"{campaign.product_name}: no summary available."
